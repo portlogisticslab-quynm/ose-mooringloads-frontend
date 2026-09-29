@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mooring Loads</title>
+  <meta name="description" content="Wind and current mooring loads on moored ships — BS 6349-1-2:2016 and OCIMF MEG3">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b4f6c'/%3E%3Cpath d='M16 6v18M10 11h12M8 19c1 4 4 6 8 6s7-2 8-6' stroke='white' stroke-width='2.4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css?v=1.0.1">
+  <script src="config.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo" aria-hidden="true">
+      <svg viewBox="0 0 32 32"><rect width="32" height="32" rx="7"/><path d="M16 6v18M10 11h12M8 19c1 4 4 6 8 6s7-2 8-6"/></svg>
+    </span>
+    <div>
+      <h1>Mooring Loads</h1>
+      <p class="sub" data-i18n="subtitle">Tải trọng gió và dòng chảy tác dụng lên tàu neo đậu</p>
+    </div>
+  </div>
+  <div class="top-actions">
+    <span id="apiStatus" class="pill pill-wait" title="API"><span class="dot"></span><span id="apiStatusText">API…</span></span>
+    <div class="seg small" role="group" aria-label="Language">
+      <button type="button" data-lang="vi" class="on">VI</button>
+      <button type="button" data-lang="en">EN</button>
+    </div>
+  </div>
+</header>
+
+<main class="layout">
+  <!-- ============================== INPUTS ============================== -->
+  <section class="col inputs">
+    <div class="card">
+      <h2><span class="num">1</span><span data-i18n="shipType">Loại tàu</span></h2>
+      <div class="seg wrap" id="shipTypeSeg" role="radiogroup"></div>
+      <div class="grid2 stack mt">
+        <label class="field">
+          <span data-i18n="shipClass">Cấp tàu</span>
+          <select id="shipClass"></select>
+        </label>
+        <label class="field">
+          <span data-i18n="bowType">Kiểu mũi tàu</span>
+          <select id="shipBow">
+            <option value="Conventional" data-i18n="bowConv">Mũi thường (Conventional)</option>
+            <option value="Cylindrical" data-i18n="bowCyl">Mũi trụ (Cylindrical)</option>
+          </select>
+        </label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="num">2</span><span data-i18n="shipData">Dữ liệu tàu</span></h2>
+      <div class="seg" role="radiogroup" id="methodSeg">
+        <button type="button" data-method="list" class="on" data-i18n="fromList">Chọn từ danh sách</button>
+        <button type="button" data-method="dwt" data-i18n="fromDwt">Tính từ DWT</button>
+      </div>
+
+      <div id="methodList" class="mt">
+        <div class="row-between">
+          <span class="muted small" id="dbSource" data-i18n="dbBuiltin">Nguồn: Ship_data.xlsx (tích hợp sẵn)</span>
+          <span class="row-gap">
+          <button type="button" id="btnBuiltin" class="btn ghost small" data-i18n="useBuiltin" hidden>Dùng dữ liệu gốc</button>
+          <label class="btn ghost small upload">
+            <input type="file" id="fileInput" accept=".xlsx,.xlsm" hidden>
+            <span data-i18n="uploadExcel">Tải file Excel…</span>
+          </label>
+          </span>
+        </div>
+        <label class="field mt-s">
+          <span data-i18n="selectShip">Chọn tàu</span>
+          <select id="shipSelect"></select>
+        </label>
+      </div>
+
+      <div id="methodDwt" class="mt" hidden>
+        <label class="field">
+          <span data-i18n="capacityDwt">Trọng tải (DWT)</span>
+          <input id="dwtInput" type="number" inputmode="decimal" value="100000" min="0" step="any">
+        </label>
+      </div>
+
+      <button type="button" id="btnLoadShip" class="btn secondary block mt" data-i18n="loadDims">Nạp kích thước tàu</button>
+    </div>
+
+    <div class="card">
+      <h2><span class="num">3</span><span data-i18n="dims">Kích thước tàu</span>
+        <span class="tag" id="shipIndexTag" hidden></span></h2>
+      <div class="grid3" id="dimsGrid"></div>
+    </div>
+
+    <div class="card">
+      <h2><span class="num">4</span><span data-i18n="conditions">Điều kiện thiết kế</span></h2>
+      <label class="field">
+        <span data-i18n="standard">Tiêu chuẩn</span>
+        <select id="standard">
+          <option value="BS">BS 6349-1-2:2016</option>
+          <option value="OCIMF">OCIMF MEG3-2008</option>
+        </select>
+      </label>
+      <table class="cond mt">
+        <thead><tr><th></th><th data-i18n="speed">Vận tốc (m/s)</th><th data-i18n="angle">Góc (độ)</th><th data-i18n="mass">Khối lượng riêng (kg/m³)</th></tr></thead>
+        <tbody>
+          <tr><th data-i18n="wind">Gió</th>
+            <td><input id="Vw" type="number" step="any" value="30.9"></td>
+            <td><select id="theta_w" class="angle"></select></td>
+            <td><input id="rho_w" type="number" step="any" value="1.28"></td></tr>
+          <tr><th data-i18n="current">Dòng chảy</th>
+            <td><input id="Vc" type="number" step="any" value="1.03"></td>
+            <td><select id="theta_c" class="angle"></select></td>
+            <td><input id="rho_c" type="number" step="any" value="1025"></td></tr>
+        </tbody>
+      </table>
+      <label class="field mt">
+        <span data-i18n="depth">Độ sâu nước tại khu neo (m)</span>
+        <input id="WD" type="number" step="any" value="24.5">
+      </label>
+    </div>
+
+    <div class="actions">
+      <button type="button" id="btnCalc" class="btn primary" data-i18n="calculate">Tính toán</button>
+      <button type="button" id="btnReset" class="btn ghost" data-i18n="reset">Đặt lại</button>
+    </div>
+  </section>
+
+  <!-- ============================== RESULTS ============================= -->
+  <section class="col results">
+    <div class="card figure">
+      <img src="assets/mooring.png" alt="Sign convention: wind/current angle, line load components Sx, Sy, Sz, S, angles alpha and beta" width="1037" height="270">
+    </div>
+
+    <div id="alert" class="alert" role="alert" hidden></div>
+
+    <div class="card">
+      <div class="row-between">
+        <h2 data-i18n="forcesTitle">Lực tác dụng lên tàu</h2>
+        <span class="muted small" id="forcesMeta"></span>
+      </div>
+      <div class="table-wrap"><table class="res" id="forcesTable"><tbody><tr><td class="empty" data-i18n="noResult">Chưa có kết quả — bấm “Tính toán”.</td></tr></tbody></table></div>
+      <details class="coef"><summary data-i18n="showCoef">Hệ số tra bảng</summary><div id="coefBox" class="muted small"></div></details>
+    </div>
+
+    <div class="card">
+      <h2 data-i18n="lineTitle">Lực trong dây neo</h2>
+      <div class="grid-angles">
+        <label class="field">
+          <span><span data-i18n="alphaLbl">Góc α</span> <em class="muted">30–60°</em></span>
+          <div class="slider"><input type="range" id="alphaRange" min="30" max="60" step="0.5" value="45"><input type="number" id="alpha" min="30" max="60" step="0.01" value="45"></div>
+        </label>
+        <label class="field">
+          <span><span data-i18n="betaLbl">Góc β</span> <em class="muted">0–45°</em></span>
+          <div class="slider"><input type="range" id="betaRange" min="0" max="45" step="0.5" value="30"><input type="number" id="beta" min="0" max="45" step="0.01" value="30"></div>
+        </label>
+        <label class="field">
+          <span data-i18n="bollards">Số bích làm việc (n)</span>
+          <input type="number" id="n" min="1" step="1" value="2">
+        </label>
+      </div>
+      <div class="kpis" id="kpis">
+        <div class="kpi"><span class="k">Sx,max</span><span class="v" id="kSx">—</span><span class="u" data-i18n="kSxNote">= max Fx (kN)</span></div>
+        <div class="kpi"><span class="k">Sy,max</span><span class="v" id="kSy">—</span><span class="u" data-i18n="kSyNote">= max Fy / n (kN)</span></div>
+        <div class="kpi"><span class="k">Sxy,max</span><span class="v" id="kSxy">—</span><span class="u">kN</span></div>
+        <div class="kpi"><span class="k">Sz,max</span><span class="v" id="kSz">—</span><span class="u">kN</span></div>
+        <div class="kpi hero"><span class="k">Smax</span><span class="v" id="kS">—</span><span class="u" data-i18n="kSNote">kN — lực kéo thiết kế</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row-between">
+        <h2 data-i18n="sweepTitle">Quét tất cả hướng gió × dòng chảy</h2>
+        <button type="button" class="btn ghost small" id="btnSweep" data-i18n="sweepBtn">Quét 64 tổ hợp</button>
+      </div>
+      <p class="muted small" data-i18n="sweepHint">Tìm tổ hợp hướng gió/dòng chảy gây Smax lớn nhất với các thông số hiện tại.</p>
+      <div class="table-wrap"><table class="heat" id="sweepTable"></table></div>
+    </div>
+
+    <div class="actions">
+      <button type="button" id="btnCsv" class="btn ghost" data-i18n="exportCsv" disabled>Xuất CSV</button>
+      <button type="button" id="btnPrint" class="btn ghost" data-i18n="print">In báo cáo</button>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <span>© 2026 <a href="https://portlogistics.vn" target="_blank" rel="noopener">portlogistics.vn</a> - converted from the MATLAB 2022 version</span>
+  <span id="verText" hidden></span>
+</footer>
+
+<div id="toast" class="toast" hidden></div>
+<script src="app.js?v=1.0.1"></script>
+</body>
+</html>
