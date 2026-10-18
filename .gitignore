@@ -1,0 +1,4 @@
+*.crdownload
+.wrangler/
+node_modules/
+.env

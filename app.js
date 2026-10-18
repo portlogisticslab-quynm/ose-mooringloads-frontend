@@ -4,7 +4,7 @@
 
   // API base: ?api=... query override (handy for local tests) > config.js
   const qsApi = new URLSearchParams(location.search).get("api");
-  const API = String(qsApi || window.MOORING_API_BASE || "").replace(/\/+$/, "");
+  void qsApi; // ?api=home|render|auto|local: xử lý trong config.js
   const $ = (id) => document.getElementById(id);
 
   // ---------------------------------------------------------------- i18n
@@ -122,19 +122,19 @@
   function busy(btn, on) { btn.classList.toggle("busy", on); btn.disabled = on; }
 
   async function api(path, opts = {}, timeoutMs = 90000) {
-    if (!API) throw new Error("MOORING_API_BASE is not configured (config.js).");
+    if (!window.oseFetch) throw new Error("config.js not loaded (oseFetch).");
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     const slow = setTimeout(() => { if (!state.apiReady) toast(t("wakeToast"), 8000); }, 2500);
     try {
-      const res = await fetch(API + path, { ...opts, signal: ctrl.signal });
+      const res = await window.oseFetch(path, { ...opts, signal: ctrl.signal });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       setApi("ok");
       return data;
     } catch (e) {
       if (e.name === "AbortError") throw new Error("Timeout — " + t("apiErr"));
-      if (e instanceof TypeError) { setApi("err"); throw new Error(t("apiErr") + " (" + API + ")"); }
+      if (e instanceof TypeError) { setApi("err"); throw new Error(t("apiErr") + " (" + (window.OSE_API_BASE || "") + ")"); }
       throw e;
     } finally { clearTimeout(timer); clearTimeout(slow); }
   }
@@ -460,4 +460,25 @@
   }
 
   document.addEventListener("DOMContentLoaded", boot);
+})();
+
+/* OSE: bộ chọn máy chủ Tự động / Home / Render (cạnh nút trạng thái API) */
+(function () {
+  const pill = document.getElementById("apiStatus");
+  if (!pill || !window.OSE_API_READY) return;
+  if (["localhost", "127.0.0.1"].includes(location.hostname)) return;
+  const sel = document.createElement("select");
+  sel.id = "backendSelect";
+  sel.title = "Máy chủ tính toán / Server";
+  sel.style.cssText = "margin-left:6px;max-width:150px;font:inherit;font-size:12px;padding:2px 4px;border-radius:6px";
+  [["auto", "Tự động (Home → Render)"], ["home", "Home server"], ["render", "Render"]]
+    .forEach(([v, l]) => sel.add(new Option(l, v)));
+  let pinned = new URLSearchParams(location.search).get("api");
+  try { pinned = pinned || localStorage.getItem("ose_api"); } catch (e) {}
+  sel.value = ["home", "render"].includes(pinned) ? pinned : "auto";
+  sel.onchange = () => { const u = new URL(location.href); u.searchParams.set("api", sel.value); location.href = u.toString(); };
+  pill.insertAdjacentElement("afterend", sel);
+  window.OSE_API_READY.then((base) => {
+    pill.title = (String(base).includes("onrender.com") ? "Render" : "Home server") + " · " + base;
+  });
 })();
